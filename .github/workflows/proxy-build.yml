@@ -26,10 +26,10 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.BITCHORD_DEBUG_KEYSTORE }}
         run: |
-          mkdir -p ~/.android
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > ~/.android/debug.keystore
-          chmod 600 ~/.android/debug.keystore
-          keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey
+          mkdir -p ~/.config/.android
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > ~/.config/.android/debug.keystore
+          chmod 600 ~/.config/.android/debug.keystore
+          keytool -list -keystore ~/.config/.android/debug.keystore -storepass android -alias androiddebugkey
 
       - name: Make Gradle executable
         run: chmod +x gradlew
