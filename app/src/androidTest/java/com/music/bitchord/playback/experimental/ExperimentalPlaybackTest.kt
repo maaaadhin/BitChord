@@ -1,6 +1,8 @@
 package com.music.bitchord.playback.experimental
 
 import android.net.Uri
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.delay
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
@@ -58,8 +60,16 @@ class ExperimentalPlaybackTest {
 
             val factory = DataSource.Factory {
                 ExperimentalAudioDataSource {
-                    audio.asList().chunked(4096)
-                        .map { it.toByteArray() }.iterator()
+                    FlowChunkIterator(flow {
+                        var offset = 0
+
+                        while (offset < audio.size) {
+                            val end = minOf(offset + 4096, audio.size)
+                            emit(audio.copyOfRange(offset, end))
+                            offset = end
+                            delay(10)
+                        }
+                    })
                 }
             }
 
