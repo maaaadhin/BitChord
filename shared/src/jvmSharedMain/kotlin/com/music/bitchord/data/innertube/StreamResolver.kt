@@ -524,8 +524,16 @@ object StreamResolver {
                 throw e
             } catch (e: Exception) {
                 TrackLog.w(TAG, "InnerTubeX failed for $videoId: ${e.javaClass.simpleName}: ${e.message}")
+                if (!uploaded) {
+                    InnerTubeXResolver.diagnoseSabr(videoId)
+                }
                 return null
-            } ?: return null
+            } ?: run {
+                if (!uploaded) {
+                    InnerTubeXResolver.diagnoseSabr(videoId)
+                }
+                return null
+            }
             val verdict = timed("$videoId InnerTubeX ${found.profileId} probe") { probe(found.url) }
             if (verdict == Probe.OK) {
                 TrackLog.d(TAG, "resolved $videoId via InnerTubeX ${found.profileId} @ ${found.kbps}kbps")

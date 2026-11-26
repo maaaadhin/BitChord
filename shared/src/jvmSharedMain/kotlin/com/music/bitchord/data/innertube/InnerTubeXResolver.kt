@@ -201,6 +201,57 @@ object InnerTubeXResolver {
         logger = logger,
     )
 
+
+    private val sabrDiagnosticStarted =
+        java.util.concurrent.atomic.AtomicBoolean(false)
+
+    suspend fun diagnoseSabr(videoId: String): String {
+        if (!sabrDiagnosticStarted.compareAndSet(false, true)) {
+            return "Diagnostic already attempted"
+        }
+        return try {
+            innerTube.cookie = Innertube.cookie
+            innerTube.visitorData = Innertube.ensureVisitorData()
+            innerTube.locale = YouTubeLocale(
+                gl = Innertube.currentRegion,
+                hl = Innertube.currentLanguage
+            )
+
+            val stream = extractor.extract(
+                videoId = videoId,
+                hints = ContentHints().withStreamCapabilities(
+                    allowHls = false,
+                    allowSabr = true,
+                    allowBoundedRange = true
+                ),
+                audioQuality = AudioQuality.AUTO,
+                clientPlaybackNonce = generateClientPlaybackNonce()
+            )
+
+            val bootstrap = stream?.sabrBootstrap
+
+            val result = when {
+                stream == null -> "No playable stream"
+                bootstrap == null ->
+                    "Direct stream selected; SABR not selected"
+                else ->
+                    "SABR bootstrap available: " +
+                    "itag=${bootstrap.audioFormat.itag}, " +
+                    "mime=${bootstrap.mimeType}, " +
+                    "durationMs=${bootstrap.durationMs}"
+            }
+
+            TrackLog.d(TAG, "SabrDiag: $result")
+            result
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            val result = "Failed: ${error::class.simpleName}"
+            TrackLog.w(TAG, "SabrDiag: $result")
+            result
+        }
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** What each minted URL was, so its fetch can be dressed and its refusal attributed. */
