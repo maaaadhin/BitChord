@@ -142,6 +142,36 @@ class CronetInterceptorTest {
                 )
             }
 
+            val streaming = okhttp3.Request.Builder()
+                .url("https://httpbin.org/stream-bytes/102400")
+                .build()
+
+            client.newCall(streaming).execute().use {
+                assertEquals(200, it.code)
+
+                val body = it.body!!
+                assertEquals(-1L, body.contentLength())
+
+                val source = body.source()
+                val buffer = okio.Buffer()
+                var total = 0L
+
+                while (true) {
+                    val count = source.read(buffer, 4096)
+                    if (count == -1L) break
+                    total += count
+                    buffer.clear()
+                }
+
+                assertEquals(102400L, total)
+            }
+
+            client.newCall(streaming).execute().use {
+                assertEquals(200, it.code)
+                val buffer = okio.Buffer()
+                assertTrue(it.body!!.source().read(buffer, 4096) > 0)
+            }
+
             assertTrue(connects.get() > 0)
             assertEquals(200, connectStatus.get())
 

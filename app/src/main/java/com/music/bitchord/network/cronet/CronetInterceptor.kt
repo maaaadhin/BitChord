@@ -3,7 +3,12 @@ package com.music.bitchord.network.cronet
 import okhttp3.Interceptor
 import okhttp3.Protocol
 import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
+import okhttp3.ResponseBody
+import okhttp3.MediaType
+import okio.Buffer
+import okio.BufferedSource
+import okio.ForwardingSource
+import okio.source
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import org.chromium.net.CronetEngine
 import okio.buffer
@@ -23,7 +28,9 @@ class CronetInterceptor(
 
         // Restrict the experimental transport to a test endpoint.
         val allowedGet =
-            request.url.host == "example.com" &&
+            (request.url.host == "example.com" ||
+                (request.url.host == "httpbin.org" &&
+                 request.url.encodedPath == "/stream-bytes/102400")) &&
             request.method == "GET" &&
             request.body == null
 
@@ -114,27 +121,57 @@ class CronetInterceptor(
                 connection.inputStream
             }
 
-            val bytes = input?.use { stream ->
-                val output = java.io.ByteArrayOutputStream()
-                val buffer = ByteArray(8192)
+            val stream = input
+                ?: java.io.ByteArrayInputStream(ByteArray(0))
 
-                while (true) {
+            val mediaType =
+                connection.contentType?.toMediaTypeOrNull()
+
+            val source = object : ForwardingSource(
+                stream.source()
+            ) {
+                private var closed = false
+
+                override fun read(
+                    sink: Buffer,
+                    byteCount: Long
+                ): Long {
                     if (chain.call().isCanceled()) {
+                        close()
                         throw IOException("Request canceled")
                     }
 
-                    val count = stream.read(buffer)
-                    if (count == -1) break
-
-                    if (output.size() + count > 1048576) {
-                        throw IOException("Response exceeds test limit")
+                    return try {
+                        val count = super.read(sink, byteCount)
+                        if (count == -1L) close()
+                        count
+                    } catch (e: IOException) {
+                        close()
+                        throw e
                     }
-
-                    output.write(buffer, 0, count)
                 }
 
-                output.toByteArray()
-            } ?: ByteArray(0)
+                override fun close() {
+                    if (closed) return
+                    closed = true
+
+                    try {
+                        super.close()
+                    } finally {
+                        connection.disconnect()
+                    }
+                }
+            }.buffer()
+
+            val responseBody = object : ResponseBody() {
+                override fun contentType(): MediaType? =
+                    mediaType
+
+                override fun contentLength(): Long = -1L
+
+                override fun source(): BufferedSource =
+                    source
+            }
 
             val builder = Response.Builder()
                 .request(request)
@@ -143,9 +180,7 @@ class CronetInterceptor(
                 .message(connection.responseMessage ?: "")
                 .sentRequestAtMillis(started)
                 .receivedResponseAtMillis(System.currentTimeMillis())
-                .body(bytes.toResponseBody(
-                    connection.contentType?.toMediaTypeOrNull()
-                ))
+                .body(responseBody)
 
             for ((name, values) in connection.headerFields) {
                 if (name == null) continue
@@ -160,11 +195,12 @@ class CronetInterceptor(
                 }
             }
 
-            builder.header("Content-Length", bytes.size.toString())
+
 
             return builder.build()
-        } finally {
+        } catch (e: Throwable) {
             connection.disconnect()
+            throw e
         }
     }
 }
