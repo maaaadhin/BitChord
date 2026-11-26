@@ -6,6 +6,8 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import org.chromium.net.CronetEngine
+import okio.buffer
+import okio.sink
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -20,10 +22,19 @@ class CronetInterceptor(
         val request = chain.request()
 
         // Restrict the experimental transport to a test endpoint.
-        if (request.url.host != "example.com" ||
+        val allowedGet =
+            request.url.host == "example.com" &&
+            request.method == "GET" &&
+            request.body == null
+
+        val allowedPost =
+            request.url.host == "httpbin.org" &&
+            request.url.encodedPath == "/post" &&
+            request.method == "POST" &&
+            request.body != null
+
+        if ((!allowedGet && !allowedPost) ||
             !request.url.isHttps ||
-            request.method != "GET" ||
-            request.body != null ||
             request.header("Authorization") != null ||
             request.header("Cookie") != null
         ) {
@@ -44,7 +55,57 @@ class CronetInterceptor(
             connection.readTimeout = 20000
             connection.instanceFollowRedirects = false
 
+            val excludedHeaders = setOf(
+                "host",
+                "connection",
+                "content-length",
+                "transfer-encoding",
+                "accept-encoding",
+                "proxy-authorization",
+                "authorization",
+                "cookie",
+                "upgrade",
+                "keep-alive",
+                "te",
+                "trailer"
+            )
+
+            for ((name, value) in request.headers) {
+                if (name.lowercase(java.util.Locale.ROOT)
+                    in excludedHeaders
+                ) continue
+
+                connection.addRequestProperty(name, value)
+            }
+
+
             val started = System.currentTimeMillis()
+
+            request.body?.let { body ->
+                val length = body.contentLength()
+
+                if (length < 0 || length > 65536 ||
+                    body.isDuplex() || body.isOneShot()
+                ) {
+                    throw IOException("Unsupported test request body")
+                }
+
+                connection.doOutput = true
+
+                body.contentType()?.let {
+                    connection.setRequestProperty(
+                        "Content-Type", it.toString()
+                    )
+                }
+
+                connection.setFixedLengthStreamingMode(length)
+
+                connection.outputStream.use { output ->
+                    val sink = output.sink().buffer()
+                    body.writeTo(sink)
+                    sink.flush()
+                }
+            }
             val code = connection.responseCode
 
             val input = if (code >= 400) {
@@ -85,6 +146,21 @@ class CronetInterceptor(
                 .body(bytes.toResponseBody(
                     connection.contentType?.toMediaTypeOrNull()
                 ))
+
+            for ((name, values) in connection.headerFields) {
+                if (name == null) continue
+
+                if (name.equals("Content-Encoding", true) ||
+                    name.equals("Content-Length", true) ||
+                    name.equals("Transfer-Encoding", true)
+                ) continue
+
+                for (value in values) {
+                    builder.addHeader(name, value)
+                }
+            }
+
+            builder.header("Content-Length", bytes.size.toString())
 
             return builder.build()
         } finally {

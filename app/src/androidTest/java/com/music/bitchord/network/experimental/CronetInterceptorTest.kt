@@ -7,6 +7,9 @@ import com.music.bitchord.data.proxy.ProxyStorage
 import com.music.bitchord.network.cronet.CronetInterceptor
 import okhttp3.Credentials
 import okhttp3.OkHttpClient
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetProvider
 import org.chromium.net.Proxy
@@ -104,6 +107,38 @@ class CronetInterceptorTest {
                 assertEquals(200, it.code)
                 assertTrue(
                     it.body!!.string().contains("Example Domain")
+                )
+            }
+
+            val payload = """{"test":"cronet-bridge"}"""
+
+            val post = okhttp3.Request.Builder()
+                .url("https://httpbin.org/post")
+                .header("X-Bridge-Test", "cronet")
+                .post(payload.toRequestBody(
+                    "application/json".toMediaType()
+                ))
+                .build()
+
+            client.newCall(post).execute().use {
+                assertEquals(200, it.code)
+
+                val result = JSONObject(it.body!!.string())
+
+                assertEquals(
+                    "cronet-bridge",
+                    result.getJSONObject("json").getString("test")
+                )
+
+                assertEquals(
+                    "cronet",
+                    result.getJSONObject("headers")
+                        .getString("X-Bridge-Test")
+                )
+
+                assertTrue(
+                    it.header("Content-Type")
+                        ?.contains("application/json") == true
                 )
             }
 
