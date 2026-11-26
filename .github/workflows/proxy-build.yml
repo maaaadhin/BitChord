@@ -21,6 +21,15 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Restore permanent debug keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BITCHORD_DEBUG_KEYSTORE }}
+        run: |
+          mkdir -p ~/.android
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > ~/.android/debug.keystore
+          chmod 600 ~/.android/debug.keystore
+          keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey
+
       - name: Make Gradle executable
         run: chmod +x gradlew
 
