@@ -54,6 +54,18 @@ jobs:
       - name: Build Dev APK
         run: ./gradlew :app:assembleDevDebug -Pbitchord.bundleWear=false --stacktrace
 
+      - name: Build instrumentation test APK
+        if: github.ref_name == 'experimental-sabr'
+        run: ./gradlew :app:assembleDevDebugAndroidTest -Pbitchord.bundleWear=false --stacktrace
+
+      - name: Upload instrumentation test APK
+        if: github.ref_name == 'experimental-sabr'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-Instrumentation
+          path: app/build/outputs/apk/androidTest/dev/debug/*.apk
+          if-no-files-found: error
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
