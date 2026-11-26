@@ -161,6 +161,48 @@ object Http {
                     "ProxyDiag",
                     "PlayerStatus: status=$status reason=${reason?.take(250)} streamingPresent=${streaming != null}"
                 )
+
+                if (streaming != null) {
+                    fun fieldPresent(
+                        obj: kotlinx.serialization.json.JsonObject,
+                        key: String
+                    ): Boolean {
+                        val value = obj[key]
+                        return value != null &&
+                            value != kotlinx.serialization.json.JsonNull &&
+                            (value !is kotlinx.serialization.json.JsonPrimitive ||
+                                value.content.isNotBlank())
+                    }
+
+                    val formats = listOf("formats", "adaptiveFormats")
+                        .flatMap { key ->
+                            (streaming[key] as? kotlinx.serialization.json.JsonArray)
+                                ?.filterIsInstance<kotlinx.serialization.json.JsonObject>()
+                                .orEmpty()
+                        }
+
+                    val audio = formats.filter {
+                        (it["mimeType"] as? kotlinx.serialization.json.JsonPrimitive)
+                            ?.content?.startsWith("audio/") == true
+                    }
+
+                    val video = formats.filter {
+                        (it["mimeType"] as? kotlinx.serialization.json.JsonPrimitive)
+                            ?.content?.startsWith("video/") == true
+                    }
+
+                    TrackLog.d(
+                        "ProxyDiag",
+                        "FormatDiag: total=${formats.size} " +
+                            "audio=${audio.size} video=${video.size} " +
+                            "audioUrls=${audio.count { fieldPresent(it, "url") }} " +
+                            "audioCipher=${audio.count { fieldPresent(it, "cipher") || fieldPresent(it, "signatureCipher") }} " +
+                            "hls=${fieldPresent(streaming, "hlsManifestUrl")} " +
+                            "dash=${fieldPresent(streaming, "dashManifestUrl")} " +
+                            "sabr=${fieldPresent(streaming, "serverAbrStreamingUrl")}"
+                    )
+                }
+
             } catch (e: Exception) {
                 TrackLog.d(
                     "ProxyDiag",
