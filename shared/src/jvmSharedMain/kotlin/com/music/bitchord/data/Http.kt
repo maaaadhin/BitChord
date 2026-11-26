@@ -243,6 +243,7 @@ object Http {
         }
         .addInterceptor(webDavInterceptor)
         .addInterceptor(playerDiagnosticInterceptor)
+        .addInterceptor(HttpTransportHook.interceptor)
         .addNetworkInterceptor { chain ->
             val request = chain.request()
             val host = request.url.host
