@@ -6,6 +6,7 @@ on:
     branches:
       - webshare-proxy
       - webshare-proxy-upgrade
+      - experimental-sabr
 
 jobs:
   build:
@@ -39,6 +40,15 @@ jobs:
 
       - name: Verify APK signing configuration
         run: ./gradlew :app:signingReport
+
+      - name: Run playback regression tests
+        if: github.ref_name == 'experimental-sabr'
+        run: |
+          ./gradlew :app:testDevDebugUnitTest \
+            --tests '*DirectAudioStreamingRegressionTest' \
+            --tests '*CachedContainerTest' \
+            --tests '*PlaybackFallbackTest' \
+            -Pbitchord.bundleWear=false --stacktrace
 
       - name: Build Dev APK
         run: ./gradlew :app:assembleDevDebug -Pbitchord.bundleWear=false --stacktrace
