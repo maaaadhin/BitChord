@@ -329,6 +329,7 @@ dependencies {
     implementation("androidx.media3:media3-common:1.11.0")
     implementation("androidx.media3:media3-datasource-okhttp:1.11.0")
     implementation("org.chromium.net:cronet-bundled:500.1.0")
+    implementation("androidx.media3:media3-datasource-cronet:1.11.0")
     // The lyrics share's video: a canvas clip, blurred, with the card laid over it.
     implementation("androidx.media3:media3-transformer:1.11.0")
     implementation("androidx.media3:media3-effect:1.11.0")
