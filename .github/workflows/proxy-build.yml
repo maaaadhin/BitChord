@@ -34,6 +34,12 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x gradlew
 
+      - name: Verify InnerTubeX dependency
+        run: ./gradlew :app:dependencyInsight --dependency innertubex --configuration devDebugRuntimeClasspath
+
+      - name: Verify APK signing configuration
+        run: ./gradlew :app:signingReport
+
       - name: Build Dev APK
         run: ./gradlew :app:assembleDevDebug -Pbitchord.bundleWear=false --stacktrace
 
