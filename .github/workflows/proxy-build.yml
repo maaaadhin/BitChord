@@ -48,6 +48,7 @@ jobs:
             --tests '*DirectAudioStreamingRegressionTest' \
             --tests '*CachedContainerTest' \
             --tests '*AudioChunkReaderTest' \
+            --tests '*FlowChunkIteratorTest' \
             --tests '*PlaybackFallbackTest' \
             -Pbitchord.bundleWear=false --stacktrace
 

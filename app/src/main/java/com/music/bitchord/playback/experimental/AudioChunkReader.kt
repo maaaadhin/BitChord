@@ -47,8 +47,10 @@ class AudioChunkReader(
     }
 
     override fun close() {
+        if (closed) return
         closed = true
         current = ByteArray(0)
         position = 0
+        (chunks as? Closeable)?.close()
     }
 }
