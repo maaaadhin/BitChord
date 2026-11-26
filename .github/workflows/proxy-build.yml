@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - webshare-proxy
+      - webshare-proxy-upgrade
 
 jobs:
   build:
