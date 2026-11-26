@@ -47,6 +47,7 @@ jobs:
           ./gradlew :app:testDevDebugUnitTest \
             --tests '*DirectAudioStreamingRegressionTest' \
             --tests '*CachedContainerTest' \
+            --tests '*AudioChunkReaderTest' \
             --tests '*PlaybackFallbackTest' \
             -Pbitchord.bundleWear=false --stacktrace
 
