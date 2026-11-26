@@ -136,6 +136,27 @@ object Http {
         .retryOnConnectionFailure(true)
         .dispatcher(Dispatcher().apply { maxRequestsPerHost = 16 })
         .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
+        .proxySelector(com.music.bitchord.data.proxy.ProxyConfig.selector)
+        .proxyAuthenticator { route, response ->
+            val config = com.music.bitchord.data.proxy.ProxyConfig.settings
+            val address = route?.proxy?.address() as? java.net.InetSocketAddress
+            val header = com.music.bitchord.data.proxy.ProxyConfig.authHeader()
+
+            if (!config.enabled ||
+                route?.proxy?.type() != java.net.Proxy.Type.HTTP ||
+                address == null ||
+                !address.hostString.equals(config.host, true) ||
+                address.port != config.port ||
+                header == null ||
+                response.request.header("Proxy-Authorization") != null
+            ) {
+                null
+            } else {
+                response.request.newBuilder()
+                    .header("Proxy-Authorization", header)
+                    .build()
+            }
+        }
         .addInterceptor(webDavInterceptor)
         .apply { if (USAGE_LOGGING_ENABLED) addNetworkInterceptor(usageInterceptor) }
         .build()

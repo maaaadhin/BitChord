@@ -230,6 +230,14 @@ fun SettingsScreen(
     onOpenChoice: (SettingsChoiceKind) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val proxyDialog = androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(false)
+    }
+    if (proxyDialog.value) {
+        com.music.bitchord.data.proxy.ProxySettingsDialog(
+            onDismiss = { proxyDialog.value = false }
+        )
+    }
 
     val wifiQuality by AppSettings.audioQualityWifi.collectAsStateWithLifecycle()
     val cellularQuality by AppSettings.audioQualityCellular.collectAsStateWithLifecycle()
@@ -1692,6 +1700,16 @@ fun SettingsScreen(
         // No footer: it only restated the stop-on-close row's own subtitle,
         // which sits four rows above it and says the same thing in fewer words.
         if (shows(SettingsCategory.MISCELLANEOUS)) SearchableSettingsGroup(search, header = stringResource(R.string.miscellaneous)) {
+            row("HTTP Proxy", "proxy", "webshare", "network") {
+                SettingsRow(
+                    icon = SfIcons.Language,
+                    title = "HTTP Proxy",
+                    subtitle = "Configure YouTube Music proxy",
+                    trailing = { Chevron() },
+                    onClick = { proxyDialog.value = true },
+                )
+            }
+
             val playNextOnSwipeTitle = stringResource(R.string.play_next_on_swipe)
             row(playNextOnSwipeTitle, "swipe", "queue") {
                 SettingsRow(

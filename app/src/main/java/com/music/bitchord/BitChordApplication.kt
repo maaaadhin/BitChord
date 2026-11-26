@@ -118,6 +118,10 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
         // share one keystore master key and a first launch must not have two
         // threads racing to create it. Joined before onCreate returns, so
         // nothing that runs after startup can see any of them half open.
+        runCatching {
+            com.music.bitchord.data.proxy.ProxyStorage.initialize(this)
+        }
+
         val backgroundInit = thread(name = "startup-init") {
             SourceRegistry.init(this)
             AndroidStreamHooks.initInnerTubeX(this)
