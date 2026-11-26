@@ -130,6 +130,48 @@ object Http {
         chain.proceed(request)
     }
 
+
+    private val playerDiagnosticInterceptor = okhttp3.Interceptor { chain ->
+        val request = chain.request()
+        val response = chain.proceed(request)
+
+        if (
+            com.music.bitchord.data.proxy.ProxyConfig.shouldProxy(request.url.host) &&
+            request.url.encodedPath == "/youtubei/v1/player" &&
+            response.isSuccessful
+        ) {
+            try {
+                val payload = response.peekBody(4L * 1024 * 1024).string()
+                val root = kotlinx.serialization.json.Json
+                    .parseToJsonElement(payload) as? kotlinx.serialization.json.JsonObject
+
+                val playability = root?.get("playabilityStatus")
+                    as? kotlinx.serialization.json.JsonObject
+
+                val status = (playability?.get("status")
+                    as? kotlinx.serialization.json.JsonPrimitive)?.content
+
+                val reason = (playability?.get("reason")
+                    as? kotlinx.serialization.json.JsonPrimitive)?.content
+
+                val streaming = root?.get("streamingData")
+                    as? kotlinx.serialization.json.JsonObject
+
+                TrackLog.d(
+                    "ProxyDiag",
+                    "PlayerStatus: status=$status reason=${reason?.take(250)} streamingPresent=${streaming != null}"
+                )
+            } catch (e: Exception) {
+                TrackLog.d(
+                    "ProxyDiag",
+                    "Player diagnostic unavailable: ${e.javaClass.simpleName}"
+                )
+            }
+        }
+
+        response
+    }
+
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -158,6 +200,7 @@ object Http {
             }
         }
         .addInterceptor(webDavInterceptor)
+        .addInterceptor(playerDiagnosticInterceptor)
         .addNetworkInterceptor { chain ->
             val request = chain.request()
             val host = request.url.host
@@ -170,6 +213,20 @@ object Http {
                 TrackLog.d(
                     "ProxyDiag",
                     "$host ${request.method} ${request.url.encodedPath} route=$proxyType status=${response.code}"
+                )
+            }
+
+
+            if (
+                com.music.bitchord.data.proxy.ProxyConfig.shouldProxy(host) &&
+                response.code in 300..399
+            ) {
+                val target = response.header("Location")
+                    ?.let { request.url.resolve(it) }
+
+                TrackLog.d(
+                    "ProxyDiag",
+                    "Redirect: $host -> ${target?.host ?: "unknown"} status=${response.code}"
                 )
             }
 
