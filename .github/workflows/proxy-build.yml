@@ -6,6 +6,7 @@ on:
     branches:
       - webshare-proxy
       - webshare-proxy-upgrade
+      - experimental-cronet
 
 jobs:
   build:
@@ -42,6 +43,18 @@ jobs:
 
       - name: Build Dev APK
         run: ./gradlew :app:assembleDevDebug -Pbitchord.bundleWear=false --stacktrace
+
+      - name: Build Cronet instrumentation APK
+        if: github.ref_name == 'experimental-cronet'
+        run: ./gradlew :app:assembleDevDebugAndroidTest -Pbitchord.bundleWear=false --stacktrace
+
+      - name: Upload Cronet instrumentation APK
+        if: github.ref_name == 'experimental-cronet'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-Instrumentation
+          path: app/build/outputs/apk/androidTest/dev/debug/*.apk
+          if-no-files-found: error
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
