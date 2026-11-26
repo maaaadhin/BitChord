@@ -158,6 +158,24 @@ object Http {
             }
         }
         .addInterceptor(webDavInterceptor)
+        .addNetworkInterceptor { chain ->
+            val request = chain.request()
+            val host = request.url.host
+            val route = chain.connection()?.route()
+            val proxyType = route?.proxy?.type()?.name ?: "UNKNOWN"
+
+            val response = chain.proceed(request)
+
+            if (com.music.bitchord.data.proxy.ProxyConfig.shouldProxy(host)) {
+                TrackLog.d(
+                    "ProxyDiag",
+                    "$host ${request.method} ${request.url.encodedPath} route=$proxyType status=${response.code}"
+                )
+            }
+
+            response
+        }
+
         .apply { if (USAGE_LOGGING_ENABLED) addNetworkInterceptor(usageInterceptor) }
         .build()
 }
