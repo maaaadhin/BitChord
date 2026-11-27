@@ -164,6 +164,9 @@ class CronetInterceptorTest {
                 }
 
                 assertEquals(102400L, total)
+                assertEquals(-1L, source.read(buffer, 4096))
+                assertEquals(-1L, source.read(buffer, 4096))
+
             }
 
             client.newCall(streaming).execute().use {

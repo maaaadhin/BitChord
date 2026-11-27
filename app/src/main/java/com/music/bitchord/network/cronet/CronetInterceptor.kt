@@ -16,6 +16,7 @@ import okio.sink
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.atomic.AtomicBoolean
 
 class CronetInterceptor(
     private val engine: CronetEngine
@@ -130,7 +131,8 @@ class CronetInterceptor(
             val source = object : ForwardingSource(
                 stream.source()
             ) {
-                private var closed = false
+                private val closed = AtomicBoolean(false)
+                private var exhausted = false
 
                 override fun read(
                     sink: Buffer,
@@ -142,8 +144,16 @@ class CronetInterceptor(
                     }
 
                     return try {
+                        if (byteCount == 0L) return 0L
+                        if (exhausted) return -1L
+
                         val count = super.read(sink, byteCount)
-                        if (count == -1L) close()
+
+                        if (count == -1L) {
+                            exhausted = true
+                            close()
+                        }
+
                         count
                     } catch (e: IOException) {
                         close()
@@ -152,8 +162,7 @@ class CronetInterceptor(
                 }
 
                 override fun close() {
-                    if (closed) return
-                    closed = true
+                    if (!closed.compareAndSet(false, true)) return
 
                     try {
                         super.close()
