@@ -1,23 +1,17 @@
 package com.music.bitchord.network.experimental
 
-import android.util.Pair
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.music.bitchord.data.proxy.ProxyStorage
 import com.music.bitchord.network.cronet.CronetInterceptor
-import okhttp3.Credentials
+import com.music.bitchord.network.cronet.CronetEngineFactory
 import okhttp3.OkHttpClient
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import org.chromium.net.CronetEngine
-import org.chromium.net.CronetProvider
-import org.chromium.net.Proxy
-import org.chromium.net.ProxyOptions
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(AndroidJUnit4::class)
@@ -34,65 +28,16 @@ class CronetInterceptorTest {
         assertTrue(config.host.isNotBlank())
         assertTrue(config.username.isNotBlank())
 
-        val auth = Credentials.basic(
-            config.username,
-            config.password
-        )
-
         val connects = AtomicInteger(0)
         val connectStatus = AtomicInteger(0)
 
-        val callback = object : Proxy.HttpConnectCallback() {
-            override fun onBeforeRequest(request: Request) {
-                connects.incrementAndGet()
-                request.proceed(
-                    listOf(Pair("Proxy-Authorization", auth))
-                )
-            }
-
-            override fun onResponseReceived(
-                headers: MutableList<Pair<String, String>>,
-                responseCode: Int
-            ): Int {
-                connectStatus.set(responseCode)
-
-                return if (responseCode == 200) {
-                    RESPONSE_ACTION_PROCEED
-                } else {
-                    RESPONSE_ACTION_CLOSE
-                }
-            }
+        val engine = CronetEngineFactory.create(
+            context,
+            config
+        ) { status ->
+            connects.incrementAndGet()
+            connectStatus.set(status)
         }
-
-        val proxy = Proxy.createHttpProxy(
-            Proxy.SCHEME_HTTP,
-            config.host,
-            config.port,
-            Executor { it.run() },
-            callback
-        )
-
-        val options = ProxyOptions.fromProxyList(
-            listOf(proxy),
-            ProxyOptions.ALL_PROXIES_FAILED_BEHAVIOR_DISALLOW_DIRECT
-        )
-
-        val provider = CronetProvider
-            .getAllProviders(context)
-            .first {
-                it.isEnabled &&
-                it.name == CronetProvider.PROVIDER_NAME_APP_PACKAGED
-            }
-
-        val engine = provider.createBuilder()
-            .enableHttp2(true)
-            .enableQuic(false)
-            .enableHttpCache(
-                CronetEngine.Builder.HTTP_CACHE_DISABLED,
-                0
-            )
-            .setProxyOptions(options)
-            .build()
 
         try {
             val client = OkHttpClient.Builder()
